@@ -7,6 +7,11 @@
         <button v-on:click="get">GetKeys</button>
         <div>{{ recvMsg }}</div>
         <div>{{msg}}</div>
+        <div>
+            <button v-on:click="onStore">Store</button>
+            <button v-on:click="onCheck">Check</button>
+            <button v-on:click="onDelete">Delete</button>
+        </div>
     </div>
 </template>
 
@@ -110,6 +115,24 @@ export default {
         websocketClose (e) {  // 关闭
             console.log('已关闭连接', e)
         },
+        onStore(){
+            this.store.dispatch('store-info')
+                .then(resCode => {
+                    console.log(resCode);
+                });
+        },
+        onCheck(){
+            this.store.dispatch('check-info', this.message.destinationUserId)
+                .then(resObj => {
+                    console.log(resObj);
+                });
+        },
+        onDelete(){
+            this.store.dispatch('delete-info', this.message.destinationUserId)
+                .then(res => {
+                    console.log(res);
+                })
+        }
     },
 }
 </script>

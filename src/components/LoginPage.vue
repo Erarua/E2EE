@@ -4,7 +4,7 @@
         <br><br>
         <button v-on:click="login">Login</button>
         <br><br>
-        <p>{{ this.store.state.registrationID }}</p>
+        <p>{{ this.store.state.registrationId }}</p>
     </div>
 </template>
 
@@ -41,12 +41,17 @@ export default {
                     }).then(successResponse => {
                         if (successResponse.data.code === 200) {
                             // router.replace('/chat')
-                            this.store.dispatch('send-keys-to-server')
-                                .then(res => {
-                                    if(res === 'ok'){
-                                        router.replace('/chat');
-                                    }
-                                });
+                            if(res.code === 400){
+                                router.replace('/chat');
+                            }
+                            if(res.code === 200) {
+                                this.store.dispatch('send-keys-to-server')
+                                    .then(res => {
+                                        if (res === 'ok') {
+                                            router.replace('/chat');
+                                        }
+                                    })
+                            }
                         }
                     }).catch(failResponse => {
                     })

@@ -145,6 +145,34 @@ export default createStore({
     },
     actions: {
         async ['registration'] (context, userId) {
+            if(localStorage.getItem(userId) != null){
+                let localInfo = JSON.parse(localStorage.getItem(userId));
+                const uid = parseInt(localInfo.userId);
+                const registrationId = parseInt(localInfo.registrationId);
+                let identityKeyPair = localInfo.identityKeyPair;
+                identityKeyPair.pubKey = base64ToArrayBuffer(identityKeyPair.pubKey);
+                identityKeyPair.privKey = base64ToArrayBuffer(identityKeyPair.privKey);
+                let signedPreKey = localInfo.signedPreKey;
+                signedPreKey.keyId = parseInt(signedPreKey.keyId);
+                signedPreKey.keyPair.pubKey = base64ToArrayBuffer(signedPreKey.keyPair.pubKey);
+                signedPreKey.keyPair.privKey = base64ToArrayBuffer(signedPreKey.keyPair.privKey);
+                signedPreKey.signature = base64ToArrayBuffer(signedPreKey.signature);
+                let preKeys = localInfo.preKeys.map(rawPreKey => {
+                    return {
+                        keyId: parseInt(rawPreKey.keyId),
+                        keyPair: {
+                            pubKey: base64ToArrayBuffer(rawPreKey.keyPair.pubKey),
+                            privKey: base64ToArrayBuffer(rawPreKey.keyPair.privKey),
+                        }
+                    };
+                });
+                context.commit('setup-registration',
+                    [uid, registrationId, identityKeyPair, preKeys, signedPreKey]);
+                return {
+                    registrationId: registrationId,
+                    code: 400
+                };
+            }
             console.info(`Generating registration ID for user [${userId}]`);
             const uid = parseInt(userId);
             console.log(uid);
@@ -160,6 +188,7 @@ export default createStore({
                 [uid, registrationId, identityKeyPair, preKeys, signedPreKey]);
             return {
                 registrationId: registrationId,
+                code: 200
             };
         },
         async ['send-keys-to-server'] (context) {
@@ -236,6 +265,44 @@ export default createStore({
             let decryptedMessage = util.toString(plaintext);
             console.log(`Decrypted message:`, decryptedMessage);
             return decryptedMessage;
+        },
+        async ['store-info'] (context) {
+            let storeObj = {
+                userId: context.state.userId,
+                registrationId: context.state.registrationId,
+                identityKeyPair: {
+                    pubKey: arrayBufferToBase64(context.state.identityKeyPair.pubKey),
+                    privKey: arrayBufferToBase64(context.state.identityKeyPair.privKey)
+                },
+                signedPreKey: {
+                    keyId: parseInt(context.state.signedPreKey.keyId),
+                    keyPair: {
+                        pubKey: arrayBufferToBase64(context.state.signedPreKey.keyPair.pubKey),
+                        privKey: arrayBufferToBase64(context.state.signedPreKey.keyPair.privKey),
+                    },
+                    signature: arrayBufferToBase64(context.state.signedPreKey.signature)
+                },
+                preKeys: context.state.preKeys.map((preKey) => {
+                    return {
+                        keyId: parseInt(preKey.keyId),
+                        keyPair: {
+                            pubKey: arrayBufferToBase64(preKey.keyPair.pubKey),
+                            privKey: arrayBufferToBase64(preKey.keyPair.privKey),
+                        }
+                    };
+                })
+            };
+            localStorage.setItem(context.state.userId, JSON.stringify(storeObj));
+            return 200;
+        },
+        async ['check-info'] (context, userId) {
+            let resObj;
+            resObj = JSON.parse(localStorage.getItem(userId));
+            return resObj;
+        },
+        async ['delete-info'] (context, userId) {
+            localStorage.removeItem(userId);
+            return 400;
         }
     },
     modules: {}
