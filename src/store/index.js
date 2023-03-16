@@ -1,14 +1,242 @@
-import { createStore } from 'vuex'
+import {createStore} from 'vuex'
+import {InMemorySignalProtocolStore} from "../../public/InMemorySignalProtocolStore";
+import axios from "axios";
 
+const ls = window.libsignal;
+const KeyHelper = ls.KeyHelper;
+const api = axios.create({baseURL: 'http://localhost:9090'})
+
+const arrayBufferToBase64 = (buffer) => {
+    let binary = '';
+    let bytes = new Uint8Array(buffer);
+    let len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+};
+
+// Util import from src/helpers.js
+var util = (function () {
+    'use strict';
+
+    var StaticArrayBufferProto = new ArrayBuffer().__proto__;
+
+    return {
+        toString: function (thing) {
+            if (typeof thing == 'string') {
+                return thing;
+            }
+            return new dcodeIO.ByteBuffer.wrap(thing).toString('binary');
+        },
+        toArrayBuffer: function (thing) {
+            if (thing === undefined) {
+                return undefined;
+            }
+            if (thing === Object(thing)) {
+                if (thing.__proto__ === StaticArrayBufferProto) {
+                    return thing;
+                }
+            }
+
+            var str;
+            if (typeof thing == "string") {
+                str = thing;
+            } else {
+                throw new Error("Tried to convert a non-string of type " + typeof thing + " to an array buffer");
+            }
+            return new dcodeIO.ByteBuffer.wrap(thing, 'binary').toArrayBuffer();
+        },
+        isEqual: function (a, b) {
+            // TODO: Special-case arraybuffers, etc
+            if (a === undefined || b === undefined) {
+                return false;
+            }
+            a = util.toString(a);
+            b = util.toString(b);
+            var maxLength = Math.max(a.length, b.length);
+            if (maxLength < 5) {
+                throw new Error("a/b compare too short");
+            }
+            return a.substring(0, Math.min(maxLength, a.length)) === b.substring(0, Math.min(maxLength, b.length));
+        }
+    };
+})();
+
+const base64ToArrayBuffer = (base64) => {
+    let binary_string = window.atob(base64);
+    let len = binary_string.length;
+    let bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binary_string.charCodeAt(i);
+    }
+    return bytes.buffer;
+};
+
+
+const DEFAULT_NUMBER_OF_PRE_KEYS = 5;
+// Generate multiple PreKeys (as per documentation)
+async function generatePreKeys (registrationId) {
+    let listOfPreKeysPromise = [];
+    for (let i = 0; i < DEFAULT_NUMBER_OF_PRE_KEYS; i++) {
+        listOfPreKeysPromise.push(KeyHelper.generatePreKey(registrationId + i + 1));
+    }
+
+    const resolvedPreKeys = await Promise.all(listOfPreKeysPromise);
+
+    const preKeys = resolvedPreKeys.map(preKey => {
+        // Create a preKey keyPair, these keys can be stored in the client
+        return {
+            keyId: preKey.keyId,
+            keyPair: preKey.keyPair
+        };
+    });
+
+    return {
+        preKeys
+    };
+}
 export default createStore({
-  state: {
-  },
-  getters: {
-  },
-  mutations: {
-  },
-  actions: {
-  },
-  modules: {
-  }
+    state: {
+        userId: null,
+        registrationId: null,
+        identityKeyPair: null,
+        signedPreKey: null,
+        preKeys: null,
+        // store needs to be a SignalProtocolStore impl
+        // used to build sessions and handle messages
+        // holds pre-keys for other users
+        store: null,
+    },
+    getters: {
+        getUserId(state) {
+            return state.userId;
+        },
+        getRegistrationId(state){
+            console.log(`getters ${state.registrationId}`);
+            return state.registrationId;
+        },
+        getUser(state){
+            return state.userId + '-' + state.registrationId;
+        }
+    },
+    mutations: {
+        ['setup-registration'] (state, [userId, registrationId, identityKeyPair, preKeys, signedPreKey]){
+            console.log(userId);
+            console.log(registrationId);
+            state.userId = parseInt(userId);
+            state.registrationId = parseInt(registrationId);
+            console.log(state.userId);
+            console.log(state.registrationId);
+            state.identityKeyPair = identityKeyPair;
+            state.signedPreKey = signedPreKey;
+            state.preKeys = preKeys;
+            console.log(identityKeyPair);
+
+            state.store = new InMemorySignalProtocolStore();
+            state.store.put('registrationId', registrationId);
+            state.store.put('identityKey', identityKeyPair);
+            preKeys.forEach(({keyId, keyPair}) => {
+                // needs to be in SignalProtocolStore
+                state.store.storePreKey(keyId, keyPair);
+            });
+            state.store.storeSignedPreKey(signedPreKey.keyId, signedPreKey.keyPair);
+        },
+    },
+    actions: {
+        async ['registration'] (context, userId) {
+            console.info(`Generating registration ID for user [${userId}]`);
+            const uid = parseInt(userId);
+            console.log(uid);
+
+            const registrationId = parseInt(KeyHelper.generateRegistrationId());
+            console.log(registrationId);
+            const identityKeyPair = await KeyHelper.generateIdentityKeyPair();
+            console.log(identityKeyPair);
+            const {preKeys} = await generatePreKeys(registrationId);
+            const signedPreKey = await KeyHelper.generateSignedPreKey(identityKeyPair, registrationId);
+            console.log(signedPreKey);
+            context.commit('setup-registration',
+                [uid, registrationId, identityKeyPair, preKeys, signedPreKey]);
+            return {
+                registrationId: registrationId,
+            };
+        },
+        async ['send-keys-to-server'] (context) {
+            let reqObj = {
+                userId: parseInt(context.state.userId),
+                registrationId: parseInt(context.state.registrationId),
+                identityKey: arrayBufferToBase64(context.state.identityKeyPair.pubKey),
+                signedPreKey: {
+                    keyId: parseInt(context.state.signedPreKey.keyId),
+                    publicKey: arrayBufferToBase64(context.state.signedPreKey.keyPair.pubKey),
+                    signature: arrayBufferToBase64(context.state.signedPreKey.signature)
+                },
+                preKeys: context.state.preKeys.map((preKey) => {
+                    return {
+                        keyId: parseInt(preKey.keyId),
+                        publicKey: arrayBufferToBase64(preKey.keyPair.pubKey)
+                    };
+                })
+            };
+            console.log(reqObj);
+            await api.post('/keysOf/' + context.state.userId, reqObj);
+            return 'ok';
+        },
+        async ['process-key'] (context, initialKeyBundle){
+            console.log(initialKeyBundle);
+            let userId = parseInt(initialKeyBundle.userId);
+            let registrationId = parseInt(initialKeyBundle.registrationId);
+
+            const address = new ls.SignalProtocolAddress(registrationId, userId);
+            const sessionBuilder = new ls.SessionBuilder(context.state.store, address);
+
+            let keys = initialKeyBundle;
+            keys.identityKey = base64ToArrayBuffer(keys.identityKey);
+            keys.signedPreKey.publicKey = base64ToArrayBuffer(keys.signedPreKey.publicKey);
+            keys.signedPreKey.signature = base64ToArrayBuffer(keys.signedPreKey.signature);
+            keys.preKey.publicKey = base64ToArrayBuffer(keys.preKey.publicKey);
+
+            console.log(`Pre keys processed:`, keys);
+
+            await sessionBuilder.processPreKey(keys);
+
+            return true;
+        },
+        async ['encrypt-message'] (context, msg){
+            console.log(msg);
+            const address = new ls.SignalProtocolAddress(msg.destinationRegistrationId, msg.destinationUserId);
+            const sessionCipher = new ls.SessionCipher(context.state.store, address);
+            const ciphertext = await sessionCipher.encrypt(msg.myMsg);
+            let resObj = {
+                destinationUserId: msg.destinationUserId,
+                destinationRegistrationId: msg.destinationRegistrationId,
+                sourceUserId: context.state.userId,
+                sourceRegistrationId: context.state.registrationId,
+                ciphertext: ciphertext
+            };
+            console.log(resObj);
+            return resObj;
+        },
+        async ['decrypt-message'] (context, msg){
+            console.log(msg);
+            const userId = parseInt(msg.sourceUserId)
+            const registrationId = parseInt(msg.sourceRegistrationId);
+            let fromAddress = new ls.SignalProtocolAddress(registrationId, userId);
+            let sessionCipher = new ls.SessionCipher(context.state.store, fromAddress);
+            let plaintext
+            if (parseInt(msg.ciphertext.type) === 3) {
+                console.log(`Cipher message type 3: decryptPreKeyWhisperMessage`);
+                plaintext = await sessionCipher.decryptPreKeyWhisperMessage(msg.ciphertext.body, 'binary');
+            } else if (parseInt(msg.ciphertext.type) === 1) {
+                console.log(`Cipher message type 1: decryptWhisperMessage`);
+                plaintext = await sessionCipher.decryptWhisperMessage(msg.ciphertext.body, 'binary');
+            }
+            console.log(plaintext);
+            let decryptedMessage = util.toString(plaintext);
+            console.log(`Decrypted message:`, decryptedMessage);
+            return decryptedMessage;
+        }
+    },
+    modules: {}
 })
