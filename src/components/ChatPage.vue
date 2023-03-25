@@ -60,10 +60,10 @@ export default {
             // alert(key+' '+e.data[key])
               let getBundleResult = await this.store.dispatch('get-key-bundle-of', key);
               if(getBundleResult){
-                  let cipherText = await this.store.dispatch('encrypt-message', this.message);
                   this.message.destinationUserId = key;
                   this.message.destinationRegistrationId = e.data[key];
                   this.message.groupId=-1;
+                  let cipherText = await this.store.dispatch('encrypt-message', this.message);
                   await this.websocketSend(JSON.stringify(cipherText));
               }
               // this.store.dispatch('get-key-bundle-of', key)
