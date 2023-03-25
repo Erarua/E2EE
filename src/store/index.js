@@ -219,17 +219,8 @@ export default createStore({
             return 'ok';
         },
         async ['get-key-bundle-of'] (context, destinationUserId){
-            let flag = false;
-            await api.get('/keyOf/'+destinationUserId)
-                .then(res => {
-                    context.dispatch('process-key', res.data)
-                        .then(result => {
-                            if(result){
-                                flag = true;
-                            }
-                        });
-                });
-            return flag;
+            let httpResponse = await api.get('/keyOf/'+destinationUserId);
+            return await context.dispatch('process-key', httpResponse.data);
         },
         async ['process-key'] (context, initialKeyBundle){
             console.log(initialKeyBundle);
