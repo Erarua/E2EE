@@ -6,6 +6,8 @@ import axios from "axios";
 
 const Vue = require('vue');
 
+
+
 axios.defaults.baseURL = '/api';
 
 const app = createApp(App);

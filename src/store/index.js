@@ -122,6 +122,7 @@ export default createStore({
     },
     mutations: {
         ['setup-registration'] (state, [userId, registrationId, identityKeyPair, preKeys, signedPreKey]){
+            console.log('setup registration')
             console.log(userId);
             console.log(registrationId);
             state.userId = parseInt(userId);
@@ -134,6 +135,7 @@ export default createStore({
             console.log(identityKeyPair);
 
             state.store = new InMemorySignalProtocolStore();
+            state.store.put('userId',userId);
             state.store.put('registrationId', registrationId);
             state.store.put('identityKey', identityKeyPair);
             preKeys.forEach(({keyId, keyPair}) => {
@@ -141,11 +143,14 @@ export default createStore({
                 state.store.storePreKey(keyId, keyPair);
             });
             state.store.storeSignedPreKey(signedPreKey.keyId, signedPreKey.keyPair);
+            // localStorage.setItem(userId,state.store)
         },
     },
     actions: {
         async ['registration'] (context, userId) {
+            console.log("inside registration")
             if(localStorage.getItem(userId) != null){
+                console.log("not null")
                 let localInfo = JSON.parse(localStorage.getItem(userId));
                 const uid = parseInt(localInfo.userId);
                 const registrationId = parseInt(localInfo.registrationId);
@@ -186,6 +191,7 @@ export default createStore({
             console.log(signedPreKey);
             context.commit('setup-registration',
                 [uid, registrationId, identityKeyPair, preKeys, signedPreKey]);
+
             return {
                 registrationId: registrationId,
                 code: 200
@@ -235,9 +241,19 @@ export default createStore({
         async ['encrypt-message'] (context, msg){
             console.log(msg);
             const address = new ls.SignalProtocolAddress(msg.destinationRegistrationId, msg.destinationUserId);
+            console.log(context.state.store)
+            console.log(context.state.userId)
+            console.log(context.state.registrationId)
             const sessionCipher = new ls.SessionCipher(context.state.store, address);
             const ciphertext = await sessionCipher.encrypt(msg.myMsg);
+            console.log(3)
+            console.log(msg.destinationUserId)
+            console.log(msg.destinationRegistrationId)
+
+
+
             let resObj = {
+                groupId:msg.groupId,
                 destinationUserId: msg.destinationUserId,
                 destinationRegistrationId: msg.destinationRegistrationId,
                 sourceUserId: context.state.userId,
@@ -248,14 +264,19 @@ export default createStore({
             return resObj;
         },
         async ['decrypt-message'] (context, msg){
-            console.log(msg);
+            const groupId = parseInt(msg.groupId)
             const userId = parseInt(msg.sourceUserId)
             const registrationId = parseInt(msg.sourceRegistrationId);
             let fromAddress = new ls.SignalProtocolAddress(registrationId, userId);
+            console.log("context.  .store:" +context.state.store)
+
+            var temp = localStorage.getItem(msg.sourceUserId);
+            // context.state.store = localStorage.getItem(msg.sourceUserId);
             let sessionCipher = new ls.SessionCipher(context.state.store, fromAddress);
             let plaintext
             if (parseInt(msg.ciphertext.type) === 3) {
                 console.log(`Cipher message type 3: decryptPreKeyWhisperMessage`);
+                console.log(msg.ciphertext.body)
                 plaintext = await sessionCipher.decryptPreKeyWhisperMessage(msg.ciphertext.body, 'binary');
             } else if (parseInt(msg.ciphertext.type) === 1) {
                 console.log(`Cipher message type 1: decryptWhisperMessage`);
@@ -296,6 +317,29 @@ export default createStore({
             return 200;
         },
         async ['check-info'] (context, userId) {
+            // let resObj;
+            // resObj = JSON.parse(localStorage.getItem(userId));
+            // console.log(resObj.userId)
+            // console.log(resObj)
+            // context.state.userId = resObj.userId;
+            // console.log(resObj.userId)
+            // console.log(context.state.userId)
+            // context.state.registrationId=resObj.registrationId;
+            // context.state.identityKeyPair.pubKey=base64ToArrayBuffer(resObj.identityKeyPair.pubKey);
+            // context.state.identityKeyPair.privKey=base64ToArrayBuffer(resObj.identityKeyPair.privKey);
+            //
+            // context.state.signedPreKey.keyId=resObj.keyId;
+            // context.state.signedPreKey.keyPair.pubKey=base64ToArrayBuffer(resObj.signedPreKey.keyPair.pubKey);
+            // context.state.signedPreKey.keyPair.privKey=base64ToArrayBuffer(resObj.signedPreKey.keyPair.privKey);
+            // context.state.signedPreKey.signature = base64ToArrayBuffer(resObj.signedPreKey.signature);
+            //
+            // resObj.preKeys.map((preKey)=>{
+            //     context.state.preKeys.add(preKey)
+            //     }
+            // )
+            //
+            //
+            // return resObj;
             let resObj;
             resObj = JSON.parse(localStorage.getItem(userId));
             return resObj;
