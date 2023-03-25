@@ -58,17 +58,19 @@ export default {
         }).then(e => {
           for (const key in e.data){
             // alert(key+' '+e.data[key])
-            this.message.destinationUserId = key;
-            this.get();
-            this.message.destinationRegistrationId = e.data[key]
-            // alert(JSON.stringify(this.message))
-            this.message.groupId=-1
-            this.store.dispatch('encrypt-message', this.message)
-                .then(res => {
-                  alert('send'+res)
-                  this.websocketSend(JSON.stringify(res));
-                });
-
+              this.store.dispatch('get-key-bundle-of', key)
+                  .then(result => {
+                      if(result){
+                          this.message.destinationUserId = key;
+                          this.message.destinationRegistrationId = e.data[key];
+                          this.message.groupId=-1
+                          this.store.dispatch('encrypt-message', this.message)
+                              .then(res => {
+                                  alert('send'+res)
+                                  this.websocketSend(JSON.stringify(res));
+                              });
+                      }
+                  });
           }
         })
 
