@@ -55,22 +55,30 @@ export default {
 
         this.$http.post('/groupOrIndividual', {
           groupId: this.message.groupId
-        }).then(e => {
+        }).then(async e => {
           for (const key in e.data){
             // alert(key+' '+e.data[key])
-              this.store.dispatch('get-key-bundle-of', key)
-                  .then(result => {
-                      if(result){
-                          this.message.destinationUserId = key;
-                          this.message.destinationRegistrationId = e.data[key];
-                          this.message.groupId=-1
-                          this.store.dispatch('encrypt-message', this.message)
-                              .then(res => {
-                                  alert('send'+res)
-                                  this.websocketSend(JSON.stringify(res));
-                              });
-                      }
-                  });
+              let getBundleResult = await this.store.dispatch('get-key-bundle-of', key);
+              if(getBundleResult){
+                  let cipherText = await this.store.dispatch('encrypt-message', this.message);
+                  this.message.destinationUserId = key;
+                  this.message.destinationRegistrationId = e.data[key];
+                  this.message.groupId=-1;
+                  await this.websocketSend(JSON.stringify(cipherText));
+              }
+              // this.store.dispatch('get-key-bundle-of', key)
+              //     .then(result => {
+              //         if(result){
+              //             this.message.destinationUserId = key;
+              //             this.message.destinationRegistrationId = e.data[key];
+              //             this.message.groupId=-1
+              //             this.store.dispatch('encrypt-message', this.message)
+              //                 .then(res => {
+              //                     alert('send'+res)
+              //                     this.websocketSend(JSON.stringify(res));
+              //                 });
+              //         }
+              //     });
           }
         })
 
