@@ -1,24 +1,45 @@
 <template>
   <div>
-    <input type="text" v-model="message.destinationUserId" placeholder="destinationUserID">
-    <input type="text" v-model="message.destinationRegistrationId" placeholder="destinationRegistrationID">
-    <input type="text" v-model="message.groupId" placeholder="groupId">;
-    <input type="text" v-model="message.myMsg" placeholder="myMsg">
-    <button v-on:click="send">Send</button>
-    <button v-on:click="get">GetKeys</button>
-    <div>{{ recvMsg }}</div>
-    <div>{{ msg }}</div>
-    <div>
-      <button v-on:click="onStore">Store</button>
-      <button v-on:click="onCheck">Check</button>
-      <button v-on:click="onDelete">Delete</button>
+    <input class="inputs" type="text" v-model="message.destinationUserId" placeholder="destinationUserID">
+  </div>
+  <div>
+    <input class="inputs" type="text" v-model="message.myMsg" placeholder="myMsg">
+    <button class="boxinput" v-on:click="send">Send</button>
+    <div v-for="msg in msgList" :key="msg.id">
+      <div v-if="msg.includes('####')" class="right">
+
+        {{ msg.split('::')[1] }}
+      </div>
+      <div v-else class="left">
+        {{ msg.split('::')[1] }}
+      </div>
+
     </div>
+    <div>
+      <el-button type="default" @click="sendmessage">Create GroupChat</el-button>
+    </div>
+    <el-dialog v-model="getMessage">
+      <el-form :model="ruleForm" ref="ruleForm" label-width="100px" class="demo-ruleForm">
+        <el-form-item>
+          <el-input v-model="groupID" placeholder="群ID"></el-input>
+        </el-form-item>
+        <el-form-item label="收件人：">{{memberList.toString().replace("[",'').replace(']','')}}
+        </el-form-item>
+        <el-form-item label="">
+          <el-input v-model="memberOne" placeholder="用户ID:" style="margin-top: 10px;"></el-input>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="addOne" style="float:right">添加</el-button>
+          <el-button type="primary" @click="cGroup" style="float:right">创建</el-button>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import {useStore} from 'vuex'
-import router from "@/router"; // 引入useStore 方法
+
 export default {
   setup() {
     const store = useStore()  // 该方法用于返回store 实例
@@ -30,12 +51,9 @@ export default {
     console.log('created')
     this.initWebSocket()
   },
-  destroyed() {
-    //销毁
-    this.websocketClose();
-  },
   data() {
     return {
+      getMessage:false,
       message: {
         groupId: -1,
         destinationUserId: '',
@@ -44,54 +62,75 @@ export default {
       },
       websocket: null,
       recvMsg: {},
-      msg: '',
+      msgList: [],
+      memberList:['gg','aa'],
+      memberOne:'',
+      groupID:'',
+      msg: ''
     }
   },
   methods: {
+    addOne(){
+      this.memberList.push(this.memberOne);
+      this.memberOne='';
+    },
+    cGroup(){
+      this.$http.post('/createGroup',{
+        groupId:this.groupID,//群聊ID，就用这个来识别群聊，应该吧，或者还要生成RID啥的
+        groupmember:this.memberList,//字面意思，list里是昵称
+        userId:this.message.destinationUserId//记录创群人是谁，可有可无
+      }).then(async e=>{
+        console.log(e.data);
+      })
+      this.groupID='';
+      this.memberList=[];
+    },
+    sendmessage(){
+      this.getMessage = true;
+    },
     send() {
       console.log('send')
 
       if (this.message.groupId !== -1) {
 
         this.$http.post('/groupOrIndividual', {
-          groupId: this.message.groupId
+          groupId: this.message.groupId,
+          userId: this.message.destinationUserId
         }).then(async e => {
-          for (const key in e.data){
+          for (const key in e.data) {
             // alert(key+' '+e.data[key])
-              let getBundleResult = await this.store.dispatch('get-key-bundle-of', key);
-              if(getBundleResult){
-                  this.message.destinationUserId = key;
-                  this.message.destinationRegistrationId = e.data[key];
-                  this.message.groupId=-1;
-                  let cipherText = await this.store.dispatch('encrypt-message', this.message);
-                  await this.websocketSend(JSON.stringify(cipherText));
-              }
-              // this.store.dispatch('get-key-bundle-of', key)
-              //     .then(result => {
-              //         if(result){
-              //             this.message.destinationUserId = key;
-              //             this.message.destinationRegistrationId = e.data[key];
-              //             this.message.groupId=-1
-              //             this.store.dispatch('encrypt-message', this.message)
-              //                 .then(res => {
-              //                     alert('send'+res)
-              //                     this.websocketSend(JSON.stringify(res));
-              //                 });
-              //         }
-              //     });
+            let getBundleResult = await this.store.dispatch('get-key-bundle-of', key);
+            if (getBundleResult) {
+              this.message.destinationUserId = key;
+              this.message.destinationRegistrationId = e.data[key];
+              this.message.groupId = -1;
+              let cipherText = await this.store.dispatch('encrypt-message', this.message);
+              await this.websocketSend(JSON.stringify(cipherText));
+            }
           }
         })
 
       } else {
-        alert('not group')
-        alert(JSON.stringify(this.message))
-        this.store.dispatch('encrypt-message', this.message)
-            .then(res => {
-              this.websocketSend(JSON.stringify(res));
-            });
+        this.$http.post('/groupOrIndividual', {
+          groupId: -1,
+          userId: this.message.destinationUserId
+        }).then(async e => {
+          // alert(key+' '+e.data[key])
+          for (const key in e.data) {
+            // alert(key+' '+e.data[key])
+            let getBundleResult = await this.store.dispatch('get-key-bundle-of', key);
+            if (getBundleResult) {
+              this.message.destinationUserId = key;
+              this.message.destinationRegistrationId = e.data[key];
+              this.message.groupId = -1;
+              this.msgList.push("####::" + this.message.myMsg);
+              let cipherText = await this.store.dispatch('encrypt-message', this.message);
+              await this.websocketSend(JSON.stringify(cipherText));
+            }
+          }
+        })
       }
-
-
+      this.message.myMsg='';
     },
     get() {
       this.$http.get('/keyOf/' + this.message.destinationUserId)
@@ -122,7 +161,6 @@ export default {
       this.websock = new WebSocket(url);
       this.websock.onmessage = this.websocketOnMessage
       this.websock.onerror = this.websocketOnError
-      // this.websock.onopen = this.websocketOnOpen
       this.websock.onclose = this.websocketClose
     },
     // websocketOnOpen() { // 连接建立之后执行send方法发送数据
@@ -146,14 +184,13 @@ export default {
       let newMsg = JSON.parse(e.data);
       alert(newMsg)
       console.log(newMsg);
-      let decrypted;
       console.log("prepare to decrypt")
       // this.store.dispatch('check-info')
       this.store.dispatch('decrypt-message', newMsg)
           .then(res => {
             console.log(res);
-            decrypted = res;
             this.msg = res;
+            this.msgList.push("###::" + res);
           });
       // console.log(decrypted);
       // alert('你有新消息'+ decrypted);
@@ -189,5 +226,61 @@ export default {
 </script>
 
 <style scoped>
+.left {
+  width: 100%;
+  float: left;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  max-width: 90%;
+  padding: 20px;
+  border-radius: 20px 20px 20px 5px;
+  background-color: rgb(56, 60, 75);
+  color: #fff;
+}
 
+.right {
+  width: 100%;
+  float: right;
+  margin-bottom: 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  max-width: 90%;
+  padding: 20px;
+  border-radius: 20px 20px 5px 20px;
+  background-color: rgb(29, 144, 245);
+  color: #fff;
+}
+
+.boxinput {
+  width: 50px;
+  height: 50px;
+  float: bottom;
+  background-color: rgb(66, 70, 86);
+  border-radius: 15px;
+  border: 1px solid rgb(80, 85, 103);
+  position: relative;
+  cursor: pointer;
+}
+
+.inputs {
+  width: 90%;
+  height: 50px;
+  float: bottom;
+  background-color: rgb(66, 70, 86);
+  border-radius: 15px;
+  border: 2px solid rgb(34, 135, 225);
+  padding: 10px;
+  box-sizing: border-box;
+  transition: 0.2s;
+  font-size: 20px;
+  color: #fff;
+  font-weight: 100;
+  margin: 0 20px;
+}
 </style>

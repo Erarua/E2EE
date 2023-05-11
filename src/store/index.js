@@ -107,6 +107,7 @@ export default createStore({
         // used to build sessions and handle messages
         // holds pre-keys for other users
         store: null,
+        friendList:[]
     },
     getters: {
         getUserId(state) {
@@ -226,7 +227,12 @@ export default createStore({
             console.log(initialKeyBundle);
             let userId = parseInt(initialKeyBundle.userId);
             let registrationId = parseInt(initialKeyBundle.registrationId);
-
+            if(context.state.friendList.includes(userId)){
+                return true;
+            }
+            else{
+                context.state.friendList.push(userId);
+            }
             const address = new ls.SignalProtocolAddress(registrationId, userId);
             const sessionBuilder = new ls.SessionBuilder(context.state.store, address);
 
