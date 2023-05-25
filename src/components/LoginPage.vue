@@ -1,11 +1,13 @@
 <template>
   <div>
-    Username: <input type="text" v-model="loginInfo.userID" placeholder="Input username"/>
+    <el-card class="card">
+    Username: <el-input type="text" v-model="loginInfo.userID" placeholder="Input username"/>
     <br><br>
-    Password: <input type="text" v-model="loginInfo.password" placeholder="Input pwd"/>
+    Password: <el-input type="text" v-model="loginInfo.password" placeholder="Input pwd"/>
     <br><br>
-    <button v-on:click="login">Login</button>
+    <el-button type="default" v-on:click="login">Login</el-button>
     <br><br>
+    </el-card>
   </div>
 </template>
 
@@ -47,7 +49,7 @@ export default {
       }).then(successResponse => {
         if (successResponse.data.code === 200) {
           this.store.dispatch('registration', this.loginInfo.userID);
-          router.replace("/chat");
+          router.replace("/cview");
         } else {
           alert("wrong")
         }
@@ -57,4 +59,11 @@ export default {
 }
 </script>
 
-<style></style>
+<style>
+.card {
+  width: 50%;
+  margin: 0 auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+</style>

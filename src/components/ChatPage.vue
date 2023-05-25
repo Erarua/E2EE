@@ -1,39 +1,40 @@
 <template>
   <div>
-    <input class="inputs" type="text" v-model="message.destinationUserId" placeholder="destinationUserID">
-  </div>
-  <div>
-    <input class="inputs" type="text" v-model="message.myMsg" placeholder="myMsg">
-    <button class="boxinput" v-on:click="send">Send</button>
-    <div v-for="msg in msgList" :key="msg.id">
-      <div v-if="msg.includes('####')" class="right">
-
-        {{ msg.split('::')[1] }}
-      </div>
-      <div v-else class="left">
-        {{ msg.split('::')[1] }}
+    <el-card class="carrd">
+      <div class="message-container">
+        <div v-for="msg in msgList" :key="msg.id" class="gg">
+          <div v-if="msg.includes('####')" class="right">
+            {{ msg.split('::')[1] }}
+          </div>
+          <div v-else class="left">
+            {{ msg.split('::')[1] }}
+          </div>
+        </div>
       </div>
 
-    </div>
-    <div>
-      <el-button type="default" @click="sendmessage">Create GroupChat</el-button>
-    </div>
-    <el-dialog v-model="getMessage">
-      <el-form :model="ruleForm" ref="ruleForm" label-width="100px" class="demo-ruleForm">
-        <el-form-item>
-          <el-input v-model="groupID" placeholder="群ID"></el-input>
-        </el-form-item>
-        <el-form-item label="收件人：">{{memberList.toString().replace("[",'').replace(']','')}}
-        </el-form-item>
-        <el-form-item label="">
-          <el-input v-model="memberOne" placeholder="用户ID:" style="margin-top: 10px;"></el-input>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="addOne" style="float:right">添加</el-button>
-          <el-button type="primary" @click="cGroup" style="float:right">创建</el-button>
-        </el-form-item>
-      </el-form>
-    </el-dialog>
+      <textarea class="inputs" type="text" v-model="message.destinationUserId" placeholder="destinationUserID"/>
+      <textarea class="inputs" type="text" v-model="message.myMsg" placeholder="myMsg"/>
+      <el-button type="primary" class="boxinput" v-on:click="send">Send</el-button>
+      <div>
+        <el-button type="default" @click="sendmessage">Create GroupChat</el-button>
+      </div>
+      <el-dialog v-model="getMessage">
+        <el-form :model="ruleForm" ref="ruleForm" label-width="100px" class="demo-ruleForm">
+          <el-form-item>
+            <el-input v-model="groupID" placeholder="群ID"></el-input>
+          </el-form-item>
+          <el-form-item label="收件人：">{{ memberList.toString().replace("[", '').replace(']', '') }}
+          </el-form-item>
+          <el-form-item label="">
+            <el-input v-model="memberOne" placeholder="用户ID:" style="margin-top: 10px;"></el-input>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="addOne" style="float:right">添加</el-button>
+            <el-button type="primary" @click="cGroup" style="float:right">创建</el-button>
+          </el-form-item>
+        </el-form>
+      </el-dialog>
+    </el-card>
   </div>
 </template>
 
@@ -53,44 +54,45 @@ export default {
   },
   data() {
     return {
-      getMessage:false,
+      getMessage: false,
       message: {
         groupId: -1,
         destinationUserId: '',
         destinationRegistrationId: '',
         myMsg: '',
+        time: '',
       },
       websocket: null,
       recvMsg: {},
       msgList: [],
-      memberList:['gg','aa'],
-      memberOne:'',
-      groupID:'',
+      memberList: [],
+      memberOne: '',
+      groupID: '',
       msg: ''
     }
   },
   methods: {
-    addOne(){
+    addOne() {
       this.memberList.push(this.memberOne);
-      this.memberOne='';
+      this.memberOne = '';
     },
-    cGroup(){
-      this.$http.post('/createGroup',{
-        groupId:this.groupID,//群聊ID，就用这个来识别群聊，应该吧，或者还要生成RID啥的
-        groupmember:this.memberList,//字面意思，list里是昵称
-        userId:this.message.destinationUserId//记录创群人是谁，可有可无
-      }).then(async e=>{
+    cGroup() {
+      this.memberList.push(this.groupID)
+      this.$http.post('/createGroup', {
+        // groupId: this.groupID,//群聊ID，就用这个来识别群聊，应该吧，或者还要生成RID啥的
+        groupMember: this.memberList,//字面意思，list里是昵称
+        // userId: this.message.destinationUserId//记录创群人是谁，可有可无
+      }).then(async e => {
         console.log(e.data);
       })
-      this.groupID='';
-      this.memberList=[];
+      this.groupID = '';
+      this.memberList = [];
     },
-    sendmessage(){
+    sendmessage() {
       this.getMessage = true;
     },
     send() {
       console.log('send')
-
       if (this.message.groupId !== -1) {
 
         this.$http.post('/groupOrIndividual', {
@@ -111,26 +113,31 @@ export default {
         })
 
       } else {
+        console.log(this.message.myMsg);
         this.$http.post('/groupOrIndividual', {
           groupId: -1,
           userId: this.message.destinationUserId
         }).then(async e => {
           // alert(key+' '+e.data[key])
           for (const key in e.data) {
+            console.log(this.message.destinationUserId);
+            console.log(this.message.myMsg);
             // alert(key+' '+e.data[key])
             let getBundleResult = await this.store.dispatch('get-key-bundle-of', key);
             if (getBundleResult) {
               this.message.destinationUserId = key;
               this.message.destinationRegistrationId = e.data[key];
               this.message.groupId = -1;
+              this.message.time = Date.now();
+              console.log(this.message.time);
               this.msgList.push("####::" + this.message.myMsg);
               let cipherText = await this.store.dispatch('encrypt-message', this.message);
+              this.message.myMsg = '';
               await this.websocketSend(JSON.stringify(cipherText));
             }
           }
         })
       }
-      this.message.myMsg='';
     },
     get() {
       this.$http.get('/keyOf/' + this.message.destinationUserId)
@@ -242,7 +249,7 @@ export default {
 }
 
 .right {
-  width: 100%;
+  width: auto;
   float: right;
   margin-bottom: 20px;
   position: relative;
@@ -255,6 +262,7 @@ export default {
   border-radius: 20px 20px 5px 20px;
   background-color: rgb(29, 144, 245);
   color: #fff;
+  word-wrap: break-word;
 }
 
 .boxinput {
@@ -281,6 +289,23 @@ export default {
   font-size: 20px;
   color: #fff;
   font-weight: 100;
-  margin: 0 20px;
+}
+
+.carrd {
+  width: 80vw;
+  height: 80vh;
+  margin: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.message-container {
+  height: 420px; /* 设置容器的高度，根据需要进行调整 */
+  overflow-y: auto; /* 添加垂直滚动条 */
+}
+.gg{
+  width:500px;
 }
 </style>

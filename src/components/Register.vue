@@ -1,11 +1,13 @@
 <template>
   <div>
-    Username: <input type="text" v-model="loginInfo.userID" placeholder="Input username"/>
+    <el-card class="card">
+    Username: <el-input type="text" v-model="loginInfo.userID" placeholder="Input username"/>
     <br><br>
-    Password: <input type="text" v-model="loginInfo.password" placeholder="Input pwd"/>
+    Password: <el-input type="text" v-model="loginInfo.password" placeholder="Input pwd"/>
     <br><br>
-    <button v-on:click="register">Register</button>
+    <el-button type="default" v-on:click="register">Register</el-button>
     <br><br>
+    </el-card>
     <p>{{ this.store.state.registrationId }}</p>
   </div>
 </template>
@@ -73,4 +75,10 @@ export default {
 }
 </script>
 
-<style></style>
+<style>
+.card {
+  width: 50%;
+  margin: 0 auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+</style>

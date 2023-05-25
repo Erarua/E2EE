@@ -268,7 +268,8 @@ export default createStore({
                 destinationRegistrationId: msg.destinationRegistrationId,
                 sourceUserId: context.state.userId,
                 sourceRegistrationId: context.state.registrationId,
-                ciphertext: ciphertext
+                ciphertext: ciphertext,
+                time:msg.time
             };
             console.log(resObj);
             return resObj;
@@ -277,10 +278,11 @@ export default createStore({
             const groupId = parseInt(msg.groupId)
             const userId = parseInt(msg.sourceUserId)
             const registrationId = parseInt(msg.sourceRegistrationId);
+            const time=msg.time;
             let fromAddress = new ls.SignalProtocolAddress(registrationId, userId);
             console.log("context.  .store:" +context.state.store)
-
-            var temp = localStorage.getItem(msg.sourceUserId);
+            //
+            // var temp = localStorage.getItem(msg.sourceUserId);
             // context.state.store = localStorage.getItem(msg.sourceUserId);
             let sessionCipher = new ls.SessionCipher(context.state.store, fromAddress);
             let plaintext
@@ -295,6 +297,7 @@ export default createStore({
             console.log(plaintext);
             let decryptedMessage = util.toString(plaintext);
             console.log(`Decrypted message:`, decryptedMessage);
+            alert("Cost:"+(Date.now()-time)+"ms");
             return decryptedMessage;
         },
         async ['store-info'] (context) {
