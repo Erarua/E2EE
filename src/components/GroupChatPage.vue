@@ -97,19 +97,24 @@ export default {
           groupId: this.message.groupId,
           // userId: this.message.destinationUserId
         }).then(async e => {
+          this.message.time = Date.now();
+          console.log(this.message.time);
+          this.msgList.push("####::" + this.message.myMsg);
           for (const key in e.data) {
-            // alert(key+' '+e.data[key])
+            alert(key)
             let getBundleResult = await this.store.dispatch('get-key-bundle-of', key);
             if (getBundleResult) {
+
               this.message.destinationUserId = key;
               this.message.destinationRegistrationId = e.data[key];
-              this.message.groupId = -1;
               let cipherText = await this.store.dispatch('encrypt-message', this.message);
+              alert(1)
               await this.websocketSend(JSON.stringify(cipherText));
             }
+            alert('ok')
           }
+          this.message.myMsg='';
         })
-
       } else {
         console.log(this.message.myMsg);
         this.$http.post('/groupOrIndividual', {
@@ -162,7 +167,7 @@ export default {
     // },
     initWebSocket() { // 初始化websocket
       let url = 'ws://localhost:9090/websocket/' + this.store.getters.getUserId;
-      alert(url)
+      // alert(url)
       this.websock = new WebSocket(url);
       this.websock.onmessage = this.websocketOnMessage
       this.websock.onerror = this.websocketOnError
@@ -183,11 +188,11 @@ export default {
       console.log('WebSocket连接失败')
     },
     websocketOnMessage(e) { // 数据接收
-      alert('receive' + JSON.parse(e.data))
+      // alert('receive' + JSON.parse(e.data))
       // console.log(e);
       // console.log('数据接收' + e.data)
       let newMsg = JSON.parse(e.data);
-      alert(newMsg)
+      // alert(newMsg)
       console.log(newMsg);
       console.log("prepare to decrypt")
       // this.store.dispatch('check-info')
@@ -202,7 +207,7 @@ export default {
     },
     websocketSend(Data) { // 数据发送
       this.websock.send(Data)
-      alert('send' + Data)
+      // alert('send' + Data)
 
     },
     websocketClose(e) {  // 关闭

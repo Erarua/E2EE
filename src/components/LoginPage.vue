@@ -46,10 +46,10 @@ export default {
       this.$http.post('/login', {
         username: this.loginInfo.userID,
         password: this.loginInfo.password,
-      }).then(successResponse => {
+      }).then(async successResponse => {
         if (successResponse.data.code === 200) {
-          this.store.dispatch('registration', this.loginInfo.userID);
-          router.replace("/cview");
+          await this.store.dispatch('registration', this.loginInfo.userID);
+          await router.replace("/cview");
         } else {
           alert("wrong")
         }
